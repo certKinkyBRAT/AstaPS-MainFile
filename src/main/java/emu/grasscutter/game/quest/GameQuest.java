@@ -66,27 +66,9 @@ public class GameQuest {
         this.startGameDay = getOwner().getWorld().getTotalGameTimeDays();
         this.state = QuestState.QUEST_STATE_UNFINISHED;
 
-        val triggerCond =
-                questData.getFinishCond().stream()
-                        .filter(p -> p.getType() == QuestContent.QUEST_CONTENT_TRIGGER_FIRE)
-                        .toList();
-        if (triggerCond.size() > 0) {
-            for (val cond : triggerCond) {
-                var newTrigger = GameData.getTriggerExcelConfigDataMap().get(cond.getParam()[0]);
-                if (newTrigger != null) {
-                    if (this.triggerData == null) {
-                        this.triggerData = new HashMap<>();
-                    }
-
-                    triggerData.put(newTrigger.getTriggerName(), newTrigger);
-                    triggers.put(newTrigger.getTriggerName(), false);
-                    var group = SceneGroup.of(newTrigger.getGroupId()).load(newTrigger.getSceneId());
-                    this.getOwner()
-                            .getWorld()
-                            .getSceneById(newTrigger.getSceneId())
-                            .loadTriggerFromGroup(group, newTrigger.getTriggerName());
-                }
-            }
+        for (var newTrigger : this.restoreTriggerData()) {
+            this.triggers.put(newTrigger.getTriggerName(), false);
+            this.registerSceneTrigger(newTrigger);
         }
 
         this.getOwner().sendPacket(new PacketQuestListUpdateNotify(this));
@@ -116,6 +98,57 @@ public class GameQuest {
         }
 
         this.save();
+    }
+
+    /**
+     * Rebuilds the lookup for this quest's TRIGGER_FIRE finish conditions. triggerData is not
+     * saved, so without this an unfinished step such as Kaeya's 46102 meeting point (trigger 1077)
+     * could never finish after a relog or server restart. Saved fired flags are kept.
+     *
+     * @return the trigger configs this quest waits on
+     */
+    public List<TriggerExcelConfigData> restoreTriggerData() {
+        if (this.questData == null || this.questData.getFinishCond() == null) return List.of();
+        var found = new ArrayList<TriggerExcelConfigData>();
+        for (val cond : this.questData.getFinishCond()) {
+            if (cond.getType() != QuestContent.QUEST_CONTENT_TRIGGER_FIRE
+                    || cond.getParam() == null || cond.getParam().length == 0) continue;
+            var trigger = GameData.getTriggerExcelConfigDataMap().get(cond.getParam()[0]);
+            if (trigger == null || trigger.getTriggerName() == null) continue;
+            if (this.triggerData == null) this.triggerData = new HashMap<>();
+            if (this.triggers == null) this.triggers = new HashMap<>();
+            this.triggerData.put(trigger.getTriggerName(), trigger);
+            this.triggers.putIfAbsent(trigger.getTriggerName(), false);
+            found.add(trigger);
+        }
+        return found;
+    }
+
+    /** Registers this quest's not-yet-fired region triggers in their scenes again after login. */
+    public void resumeSceneTriggers() {
+        if (this.state != QuestState.QUEST_STATE_UNFINISHED) return;
+        for (var trigger : this.restoreTriggerData()) {
+            if (Boolean.TRUE.equals(this.triggers.get(trigger.getTriggerName()))) continue;
+            this.registerSceneTrigger(trigger);
+        }
+    }
+
+    private void registerSceneTrigger(TriggerExcelConfigData trigger) {
+        try {
+            var group = SceneGroup.of(trigger.getGroupId()).load(trigger.getSceneId());
+            this.getOwner()
+                    .getWorld()
+                    .getSceneById(trigger.getSceneId())
+                    .loadTriggerFromGroup(group, trigger.getTriggerName());
+        } catch (RuntimeException e) {
+            Grasscutter.getLogger()
+                    .warn(
+                            "Could not register trigger {} (group {}) for quest {}",
+                            trigger.getTriggerName(),
+                            trigger.getGroupId(),
+                            this.subQuestId,
+                            e);
+        }
     }
 
     /**
@@ -158,6 +191,7 @@ public class GameQuest {
                 reconcileProgress(this.finishProgressList, config.getFinishCond().size());
         this.failProgressList =
                 reconcileProgress(this.failProgressList, config.getFailCond().size());
+        if (this.state == QuestState.QUEST_STATE_UNFINISHED) this.restoreTriggerData();
     }
 
     private static int[] reconcileProgress(int[] saved, int expectedSize) {

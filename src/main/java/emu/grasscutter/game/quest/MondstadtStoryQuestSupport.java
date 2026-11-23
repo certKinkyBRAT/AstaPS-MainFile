@@ -19,7 +19,9 @@ import java.util.Set;
  */
 public final class MondstadtStoryQuestSupport {
     private static final Set<Integer> MAIN_QUEST_IDS =
-            Set.of(311, 427, 451, 452, 453, 454, 461, 462, 463, 469, 480, 481, 482, 484, 485);
+            Set.of(311, 427, 451, 452, 453, 454, 461, 462, 463, 469, 480, 481, 482, 484, 485,
+                    // Xiangling's Trulla Chapter (reviewed gates; the first steps were "quest 0").
+                    11000, 11001, 11002, 11003, 11004, 11005);
 
     private MondstadtStoryQuestSupport() {}
 

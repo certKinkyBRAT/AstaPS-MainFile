@@ -15,7 +15,7 @@ import java.util.Set;
 /** Rechecks the reviewed Mondstadt story gates (Kaeya, Amber, Razor) when an older character missed their events. */
 public final class MondstadtStoryQuestSupport {
     private static final Set<Integer> MAIN_QUEST_IDS =
-            Set.of(427, 451, 452, 453, 454, 461, 480, 481, 482, 484, 485);
+            Set.of(427, 451, 452, 453, 454, 461, 462, 463, 480, 481, 482, 484, 485);
 
     private MondstadtStoryQuestSupport() {}
 

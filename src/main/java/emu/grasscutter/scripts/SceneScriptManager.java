@@ -1169,6 +1169,7 @@ public class SceneScriptManager {
                                         t ->
                                                 (t.getName().length() <= 12
                                                                 || t.getName().substring(13).equals(String.valueOf(params.param1)))
+                                                        && isRegionTriggerInEventGroup(t, params)
                                                         && (t.getSource().isEmpty()
                                                                 || t.getSource().equals(params.getEventSource())))
                                 .collect(Collectors.toSet());
@@ -1258,6 +1259,27 @@ public class SceneScriptManager {
         }
     }
 
+    /**
+     * Region config ids are only unique inside one group: scene 3 alone has four groups with a
+     * region 70 (one of them Kaeya's 46102 meeting point). A region event must only reach the
+     * triggers of the group that owns the region.
+     */
+    static boolean isRegionTriggerInEventGroup(SceneTrigger trigger, ScriptArgs params) {
+        if (params.getGroupId() <= 0) return true;
+        var group = trigger.getCurrentGroup();
+        return group == null || group.id == params.getGroupId();
+    }
+
+    /** The region an event came from: by entity id first, then by group and config id. */
+    Optional<EntityRegion> findEventRegion(ScriptArgs params) {
+        var source = this.regions.get(params.getSourceEntityId());
+        if (source != null && source.getConfigId() == params.param1) return Optional.of(source);
+        return this.regions.values().stream()
+                .filter(p -> p.getConfigId() == params.param1)
+                .filter(p -> params.getGroupId() <= 0 || p.getGroupId() == params.getGroupId())
+                .findFirst();
+    }
+
     private boolean evaluateTriggerCondition(SceneTrigger trigger, ScriptArgs params) {
         Grasscutter.getLogger()
                 .trace(
@@ -1292,9 +1314,7 @@ public class SceneScriptManager {
             if (event == EventType.EVENT_ENTER_REGION || event == EventType.EVENT_LEAVE_REGION) {
                 // The region an event names is not always still loaded - get(0) on the empty result
                 // threw out of here, leaving the trigger ongoing and never deregistering it
-                this.regions.values().stream()
-                        .filter(p -> p.getConfigId() == params.param1)
-                        .findFirst()
+                findEventRegion(params)
                         .ifPresent(
                                 region -> {
                                     var metaRegion = region.getMetaRegion();

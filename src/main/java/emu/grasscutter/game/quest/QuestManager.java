@@ -359,6 +359,9 @@ public final class QuestManager extends BasePlayerManager {
                 // player.sendPacket(new PacketQuestProgressUpdateNotify(activeQuest));
             }
             quest.checkProgress();
+            if (isQuestingActive()) {
+                quest.getChildQuests().values().forEach(GameQuest::resumeSceneTriggers);
+            }
         }
 
         if (isQuestingActive()) {

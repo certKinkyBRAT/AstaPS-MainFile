@@ -12,10 +12,14 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Set;
 
-/** Rechecks the reviewed Mondstadt story gates (Kaeya, Amber, Razor) when an older character missed their events. */
+/**
+ * Rechecks the reviewed Mondstadt story gates (Kaeya, Amber, Razor) when an older character missed
+ * their events. 311 and 469 close Prologue Act I: Paimon's 31101 talks need 46904 (first Anemoculus)
+ * started, and 31101 finishing lifts the starter-region barrier (OpenState 47).
+ */
 public final class MondstadtStoryQuestSupport {
     private static final Set<Integer> MAIN_QUEST_IDS =
-            Set.of(427, 451, 452, 453, 454, 461, 462, 463, 480, 481, 482, 484, 485);
+            Set.of(311, 427, 451, 452, 453, 454, 461, 462, 463, 469, 480, 481, 482, 484, 485);
 
     private MondstadtStoryQuestSupport() {}
 

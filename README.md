@@ -1,5 +1,7 @@
 # AstaPS
 
+NOTE: This is a vibecoded/slopcoded fork of AstaPS primarily dedicated to fixing questing. I have little coding experience myself and this is mostly just a project for myself. If your not interested in vibecoded projects, this is not for you.
+
 English · [简体中文](README_zh-CN.md) · [繁體中文](README_zh-TW.md)
 
 A private server for Genshin Impact **7.2.0**, built on Grasscutter.

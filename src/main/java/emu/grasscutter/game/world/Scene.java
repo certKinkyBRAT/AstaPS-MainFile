@@ -1433,9 +1433,10 @@ public class Scene {
                 groupInstance = cachedInstance;
             }
 
+            int suite = emu.grasscutter.game.quest.LiyueSceneGroupRecovery.selectSuite(this, groupInstance);
+            if (suite == 0) suite = this.questOwnedSuite(group.id, groupInstance.getActiveSuiteId());
             emu.grasscutter.game.dailytask.DailyTaskGroupLifecycle.load(
-                    this.getScriptManager(), groupInstance,
-                    emu.grasscutter.game.quest.LiyueSceneGroupRecovery.selectSuite(this, groupInstance));
+                    this.getScriptManager(), groupInstance, suite);
 
             this.loadedGroups.add(group);
         }
@@ -1637,6 +1638,27 @@ public class Scene {
         return npcList.stream()
                 .filter(i -> this.npcBornEntrySet.contains(i) || sceneNpcBornEntries.contains(i))
                 .toList();
+    }
+
+    /**
+     * The suite an active quest owns for this group, when the group would otherwise load on a
+     * different one. Quest suites were only replayed on scene entry, which is skipped while the
+     * scene's scripts are still loading at login; a group loading later then came up on its init
+     * suite (e.g. 46209's Cryo tablet puzzle 133002173 on its empty suite 2).
+     */
+    private int questOwnedSuite(int groupId, int activeSuite) {
+        var host = this.getWorld() != null ? this.getWorld().getHost() : null;
+        if (host == null || host.getQuestManager() == null) return 0;
+        return questOwnedSuite(host.getQuestManager().getSceneGroupSuite(this.getId()), groupId, activeSuite);
+    }
+
+    static int questOwnedSuite(List<QuestGroupSuite> owned, int groupId, int activeSuite) {
+        if (owned == null) return 0;
+        int suite = 0;
+        for (var entry : owned) {
+            if (entry != null && entry.getGroup() == groupId) suite = entry.getSuite();
+        }
+        return suite > 0 && suite != activeSuite ? suite : 0;
     }
 
     public void loadGroupForQuest(List<QuestGroupSuite> sceneGroupSuite) {

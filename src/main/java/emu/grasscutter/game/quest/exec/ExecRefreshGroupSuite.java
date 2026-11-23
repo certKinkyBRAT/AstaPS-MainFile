@@ -7,8 +7,11 @@ import emu.grasscutter.game.quest.QuestValueExec;
 import emu.grasscutter.game.quest.enums.QuestExec;
 import emu.grasscutter.game.quest.enums.QuestState;
 import emu.grasscutter.game.quest.handlers.QuestExecHandler;
+import emu.grasscutter.scripts.SceneScriptManager;
 import emu.grasscutter.scripts.data.SceneGroup;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.function.BooleanSupplier;
 
 /** Apply native group-suite actions after scene scripts initialize, without timed polling. */
@@ -34,6 +37,9 @@ public class ExecRefreshGroupSuite extends QuestExecHandler {
         if (scene == null) return false;
         var scripts = scene.getScriptManager();
         var dispatchedState = quest.getState();
+        // Save the quest's intent before applying it. Applying can be deferred or dropped while
+        // the scene is still loading at login; the saved suite is replayed when the group loads.
+        rememberRequestedSuites(quest, sceneId, params[1]);
 
         if (!scripts.isInit()) {
             scripts.whenInitialized(ready -> {
@@ -57,6 +63,35 @@ public class ExecRefreshGroupSuite extends QuestExecHandler {
             return true;
         }
         return apply(quest, params, sceneId, scene);
+    }
+
+    /** Parse "group,suite;group,suite" into pairs, skipping malformed or invalid entries. */
+    static List<int[]> parseGroupSuitePairs(String spec) {
+        var pairs = new ArrayList<int[]>();
+        if (spec == null) return pairs;
+        for (String entry : spec.split(";")) {
+            String[] pair = entry.split(",");
+            if (pair.length != 2) continue;
+            try {
+                int groupId = Integer.parseInt(pair[0].trim());
+                int suiteId = Integer.parseInt(pair[1].trim());
+                if (groupId > 0 && suiteId >= 0) pairs.add(new int[] {groupId, suiteId});
+            } catch (NumberFormatException ignored) {
+                // Reported by apply().
+            }
+        }
+        return pairs;
+    }
+
+    private static void rememberRequestedSuites(GameQuest quest, int sceneId, String spec) {
+        var main = quest.getMainQuest();
+        if (main == null || main.getQuestGroupSuites() == null) return;
+        boolean changed = false;
+        for (int[] pair : parseGroupSuitePairs(spec)) {
+            changed |= SceneScriptManager.rememberQuestGroupSuite(
+                    main.getQuestGroupSuites(), sceneId, pair[0], pair[1]);
+        }
+        if (changed) quest.save();
     }
 
     /** Keep a group visible only while a successful quest suite override owns it. */

@@ -133,6 +133,37 @@ public final class QuestManager extends BasePlayerManager {
     }
 
     /**
+     * Activates the hand-in an unfinished step finishes on. QuestExcel keeps only 14
+     * ACTIVE_ITEM_GIVING actions for 582 FINISH_ITEM_GIVING steps, so without this the giving
+     * talk (ITEM_GIVING_ACTIVED) never appears and the step cannot finish.
+     */
+    public void activateStepGivings(GameQuest quest) {
+        if (quest == null || quest.getState() != QuestState.QUEST_STATE_UNFINISHED
+                || quest.getQuestData() == null || quest.getQuestData().getFinishCond() == null) return;
+        for (var condition : quest.getQuestData().getFinishCond()) {
+            if (condition.getType() != QuestContent.QUEST_CONTENT_FINISH_ITEM_GIVING
+                    || condition.getParam() == null || condition.getParam().length == 0) continue;
+            this.ensureGivingActive(condition.getParam()[0]);
+        }
+    }
+
+    /** Adds the giving, or reopens it when a restarted step finds it already completed. */
+    void ensureGivingActive(int givingId) {
+        if (GameData.getGivingDataMap().get(givingId) == null) return;
+        var givings = this.player.getPlayerProgress().getItemGivings();
+        var record = givings.get(givingId);
+        if (!needsActivation(record)) return;
+        if (record == null) givings.put(givingId, ItemGiveRecord.resolve(givingId));
+        else record.setFinished(false);
+        player.save();
+        this.sendGivingRecords();
+    }
+
+    static boolean needsActivation(ItemGiveRecord record) {
+        return record == null || record.isFinished();
+    }
+
+    /**
      * Marks a giving action as completed.
      *
      * @param givingId The giving action ID.
@@ -361,6 +392,7 @@ public final class QuestManager extends BasePlayerManager {
             quest.checkProgress();
             if (isQuestingActive()) {
                 quest.getChildQuests().values().forEach(GameQuest::resumeSceneTriggers);
+                quest.getChildQuests().values().forEach(this::activateStepGivings);
             }
         }
 

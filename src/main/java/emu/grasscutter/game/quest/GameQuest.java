@@ -86,6 +86,7 @@ public class GameQuest {
         this.triggerStateEvents();
 
         this.executeActions(this.questData.getBeginExec());
+        this.getOwner().getQuestManager().activateStepGivings(this);
         this.getOwner().getQuestManager().checkQuestAlreadyFulfilled(this);
         MondstadtStoryQuestSupport.enableDungeonEntry(this);
         AmberFlightExamSupport.ensure(this);

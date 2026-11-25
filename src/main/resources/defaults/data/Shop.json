@@ -13740,7 +13740,7 @@
         "secondarySheetId": 1,
         "refreshType": "SHOP_REFRESH_MONTHLY",
         "shopRefreshParam": 1,
-        "hcoin": 160
+        "hcoin": 320
       },
       {
         "goodsId": 102002,
@@ -13757,7 +13757,7 @@
         "secondarySheetId": 1,
         "refreshType": "SHOP_REFRESH_MONTHLY",
         "shopRefreshParam": 1,
-        "hcoin": 160
+        "hcoin": 320
       },
       {
         "goodsId": 102003,
@@ -13768,28 +13768,7 @@
         "costItemList": [
           {
             "id": 221,
-            "count": 5
-          }
-        ],
-        "buyLimit": 0,
-        "beginTime": 1575129600,
-        "endTime": 2051193600,
-        "minLevel": 4,
-        "maxLevel": 99,
-        "secondarySheetId": 3,
-        "refreshType": "SHOP_REFRESH_MONTHLY",
-        "shopRefreshParam": 1
-      },
-      {
-        "goodsId": 102004,
-        "goodsItem": {
-          "id": 224,
-          "count": 1
-        },
-        "costItemList": [
-          {
-            "id": 221,
-            "count": 5
+            "count": 25
           }
         ],
         "buyLimit": 0,

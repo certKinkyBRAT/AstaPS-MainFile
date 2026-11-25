@@ -536,6 +536,16 @@ public class ScriptLib {
         return 0;
     }
 
+    /**
+     * Boss arenas (Cryo Regisvine and ten other groups) call this on entering their region to
+     * steer the camera towards the boss. Camera framing is client-side; without the stub the
+     * enter-region trigger died with "attempt to call nil".
+     */
+    public int TrySetPlayerEyePoint(LuaTable smallRegion, LuaTable bigRegion, int var3, LuaTable var4) {
+        logger.debug("[LUA] Call TrySetPlayerEyePoint (camera framing, no-op)");
+        return 0;
+    }
+
     /** Original Lua names its reward config; Java owns the reward entity and receipt. */
     public int CreateBlossomChestByGroupId(int groupId, int configId) {
         var group = currentGroup.getIfExists();

@@ -17,11 +17,14 @@ public class HandlerEvtCreateGadgetNotify extends PacketHandler {
 
         var scene = session.getPlayer().getScene();
 
+        var gadgetId = notify.getConfigId();
+        emu.grasscutter.game.world.BossTraceHelper.gadgetCreated(
+                "created by client", gadgetId, notify.getEntityId(), notify.getOwnerEntityId());
+
         if (scene.getEntityById(notify.getEntityId()) != null) {
             return;
         }
 
-        var gadgetId = notify.getConfigId();
         EntityClientGadget gadget =
                 switch (gadgetId) {
 

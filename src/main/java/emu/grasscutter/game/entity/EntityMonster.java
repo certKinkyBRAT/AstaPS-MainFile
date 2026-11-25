@@ -341,6 +341,10 @@ public class EntityMonster extends GameEntity {
     public void onDeath(int killerId) {
         super.onDeath(killerId); // Invoke super class's onDeath() method.
         var scene = this.getScene();
+        try {
+            emu.grasscutter.game.world.EffigyCombatHelper.onMonsterDeath(this);
+        } catch (Throwable ignored) {
+        }
         // The reward flower belongs to the monster's actual death. Handle it before
         // unrelated Lua/challenge callbacks, which may fail and abort death processing.
         try {

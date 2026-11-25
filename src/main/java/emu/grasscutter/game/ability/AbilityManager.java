@@ -1227,6 +1227,8 @@ public final class AbilityManager extends BasePlayerManager {
                 // Same resolved name the MaxHPRatio block above uses: the limbo bookkeeping keys on
                 // ability + modifier name, and a null name would leave the modifier untracked.
                 entity.onAddAbilityModifier(modifierData, instancedAbility, resolvedModName);
+                emu.grasscutter.game.world.BossTraceHelper.modifier(
+                        entity, true, instancedAbilityData.abilityName, resolvedModName);
                 emu.grasscutter.game.world.EffigyCombatHelper.onModifiersChanged(entity);
             } catch (Throwable ignored) {
             }
@@ -1276,6 +1278,20 @@ public final class AbilityManager extends BasePlayerManager {
         } else if (modChange.getAction() == ModifierAction.ModifierAction_REMOVED) {
             AbilityModifierController removed =
                     entity.getInstancedModifiers().remove(head.getInstancedModifierId());
+            if (removed != null && removed.getAbilityData() != null) {
+                try {
+                    String tracedName = null;
+                    for (var e : removed.getAbilityData().modifiers.entrySet()) {
+                        if (e.getValue() == removed.getModifierData()) {
+                            tracedName = e.getKey();
+                            break;
+                        }
+                    }
+                    emu.grasscutter.game.world.BossTraceHelper.modifier(
+                            entity, false, removed.getAbilityData().abilityName, tracedName);
+                } catch (Throwable ignored) {
+                }
+            }
             if (removed != null) {
                 emu.grasscutter.game.quest.LiyueAmberQuestSupport.onModifierRemoved(
                         this.player, entity, removed.getAbilityData(), removed.getModifierData());
@@ -1463,6 +1479,7 @@ public final class AbilityManager extends BasePlayerManager {
 
         try {
             emu.grasscutter.game.world.EffigyCombatHelper.onGlobalValue(entity, key, value);
+            emu.grasscutter.game.world.BossTraceHelper.globalValue(entity, key, value);
         } catch (Throwable ignored) {
         }
 

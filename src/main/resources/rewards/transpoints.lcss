@@ -10,7 +10,7 @@ transpoint[type="waypoint"],
 transpoint[type="statue"],
 transpoint[type="domain"] {
     genshin.experience.adventure: 50;
-    genshin.currency.primogem: 5;
+    genshin.currency.primogem: 8000;
 }
 
 /* 教学锚点：scene 3 / point 6，覆盖普通首次激活奖励。 */
@@ -23,5 +23,5 @@ transpoint[scene=3][point=6] {
 transpoint[scene=7] {
     genshin.currency.sigil.light_realm: 20;
     genshin.experience.adventure: 0;
-    genshin.currency.primogem: 5;
+    genshin.currency.primogem: 8000;
 }

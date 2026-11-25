@@ -30,33 +30,33 @@ chest[type="normal"] {
 /* 原石：先按品级，再按旧地区及特定区域覆盖。 */
 
 chest[type="normal"][grade="common"] {
-    genshin.currency.primogem: 2;
+    genshin.currency.primogem: 8000;
 }
 
 chest[type="normal"][grade="exquisite"] {
-    genshin.currency.primogem: 5;
+    genshin.currency.primogem: 12800;
 }
 
 chest[type="normal"][grade="precious"],
 chest[type="normal"][grade="luxurious"] {
-    genshin.currency.primogem: 10;
+    genshin.currency.primogem: 16000;
 }
 
 /* 蒙德、璃月旧区域使用较低原石奖励。 */
 
 chest[type="normal"][grade="common"][city=1],
 chest[type="normal"][grade="common"][city=2] {
-    genshin.currency.primogem: 0;
+    genshin.currency.primogem: 4800;
 }
 
 chest[type="normal"][grade="exquisite"][city=1],
 chest[type="normal"][grade="exquisite"][city=2] {
-    genshin.currency.primogem: 2;
+    genshin.currency.primogem: 8000;
 }
 
 chest[type="normal"][grade="precious"][city=1],
 chest[type="normal"][grade="precious"][city=2] {
-    genshin.currency.primogem: 5;
+    genshin.currency.primogem: 12800;
 }
 
 /* 高原石区域：龙脊雪山、风息山、璃沙郊、层岩巨渊、沉玉谷·上谷、
@@ -64,15 +64,15 @@ chest[type="normal"][grade="precious"][city=2] {
  */
 
 chest[type="normal"][grade="common"][area in (10, 77, 8, 19, 40, 41, 47, 300)] {
-    genshin.currency.primogem: 2;
+    genshin.currency.primogem: 8000;
 }
 
 chest[type="normal"][grade="exquisite"][area in (10, 77, 8, 19, 40, 41, 47, 300)] {
-    genshin.currency.primogem: 5;
+    genshin.currency.primogem: 12800;
 }
 
 chest[type="normal"][grade="precious"][area in (10, 77, 8, 19, 40, 41, 47, 300)] {
-    genshin.currency.primogem: 10;
+    genshin.currency.primogem: 16000;
 }
 
 /* 印记元素绑定：city 8/9 共用冰元素。 */

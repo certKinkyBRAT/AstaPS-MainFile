@@ -71,6 +71,12 @@ public final class BossTraceHelper {
                 note);
     }
 
+    /** An ability message for a traced entity that the server could not use. */
+    public static void dropped(GameEntity entity, String what) {
+        if (entity == null || !isTraced(entity)) return;
+        log("{} DROPPED {}", describe(entity), what);
+    }
+
     public static void removed(GameEntity entity, String why) {
         if (!isTraced(entity)) return;
         log("{} removed ({})", describe(entity), why);

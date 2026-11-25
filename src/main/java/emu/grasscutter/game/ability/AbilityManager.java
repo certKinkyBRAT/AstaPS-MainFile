@@ -651,6 +651,42 @@ public final class AbilityManager extends BasePlayerManager {
         target.addSpecialEnergy(specialEnergyAdd);
     }
 
+    /** How long a removed monster modifier can still resolve its own onRemoved actions. */
+    private static final long REMOVED_MODIFIER_GRACE_MS = 5000;
+
+    private record RemovedModifier(AbilityModifierController controller, long removedAt) {}
+
+    private final Map<Long, RemovedModifier> recentlyRemovedModifiers = new ConcurrentHashMap<>();
+
+    private static long removedModifierKey(int entityId, int instancedModifierId) {
+        return ((long) entityId << 32) | (instancedModifierId & 0xFFFFFFFFL);
+    }
+
+    void rememberRemovedModifier(int entityId, int instancedModifierId, AbilityModifierController controller) {
+        rememberRemovedModifier(entityId, instancedModifierId, controller, System.currentTimeMillis());
+    }
+
+    void rememberRemovedModifier(
+            int entityId, int instancedModifierId, AbilityModifierController controller, long now) {
+        recentlyRemovedModifiers.values().removeIf(r -> now - r.removedAt() > REMOVED_MODIFIER_GRACE_MS);
+        recentlyRemovedModifiers.put(
+                removedModifierKey(entityId, instancedModifierId), new RemovedModifier(controller, now));
+    }
+
+    Ability recentlyRemovedModifierAbility(int entityId, int instancedModifierId) {
+        var controller =
+                recentlyRemovedModifier(entityId, instancedModifierId, System.currentTimeMillis());
+        return controller != null ? controller.getAbility() : null;
+    }
+
+    AbilityModifierController recentlyRemovedModifier(int entityId, int instancedModifierId, long now) {
+        var removed = recentlyRemovedModifiers.get(removedModifierKey(entityId, instancedModifierId));
+        if (removed == null || now - removed.removedAt() > REMOVED_MODIFIER_GRACE_MS) {
+            return null;
+        }
+        return removed.controller();
+    }
+
     public void handleServerInvoke(AbilityInvokeEntry invoke) {
         var head = invoke.getHead();
 
@@ -672,6 +708,12 @@ public final class AbilityManager extends BasePlayerManager {
             ability = entity.getInstancedModifiers().get(head.getInstancedModifierId()).getAbility();
         }
 
+        if (ability == null && head.getInstancedModifierId() != 0) {
+            // The client can report a modifier's removal before the actions its onRemoved ran
+            // (the Regisvine's corolla CreateGadget), so look in what was just removed too.
+            ability = recentlyRemovedModifierAbility(entity.getId(), head.getInstancedModifierId());
+        }
+
         if (ability == null
             && head.getInstancedAbilityId() != 0
             && (head.getInstancedAbilityId() - 1) < entity.getInstancedAbilities().size()) {
@@ -679,6 +721,11 @@ public final class AbilityManager extends BasePlayerManager {
         }
 
         if (ability == null) {
+            emu.grasscutter.game.world.BossTraceHelper.dropped(
+                    entity,
+                    "action: ability not found (abilityIdx=" + head.getInstancedAbilityId()
+                            + " modId=" + head.getInstancedModifierId()
+                            + " localId=" + head.getLocalId() + ")");
             Grasscutter.getLogger().trace(
                 "[InvokeMiss] ability not found: entity={} abilId={} modId={} listSize={}",
                 entity.getId(), head.getInstancedAbilityId(), head.getInstancedModifierId(),
@@ -714,6 +761,9 @@ public final class AbilityManager extends BasePlayerManager {
             }
         }
 
+        emu.grasscutter.game.world.BossTraceHelper.dropped(
+                entity,
+                "action: localId " + head.getLocalId() + " not found in " + ability.getData().abilityName);
         Grasscutter.getLogger().trace(
             "handleServerInvoke: action/mixin not found: localId={} ability={} knownActionIds={} knownMixinIds={}",
             head.getLocalId(),
@@ -1008,7 +1058,27 @@ public final class AbilityManager extends BasePlayerManager {
         var head = invoke.getHead();
 
         boolean isRemove = modChange.getAction() == ModifierAction.ModifierAction_REMOVED;
-        if ((head.getInstancedAbilityId() == 0 && !isRemove) || head.getInstancedModifierId() > 2000) {
+        // A modifier from an ability the entity was not built with (the Regisvine's
+        // Regisvine_Fruit_Begin applying CreateFruit_Delayed, say) arrives with ability index 0 and
+        // only the parent ability's name. The original guard dropped it before that name was read,
+        // so the server never knew the modifier and could not resolve the CreateGadget the client
+        // sent when it expired: the corolla was never made. Monsters only, so avatar handling,
+        // which was built around this guard, is unchanged.
+        var parentNameForGuard = modChange.getParentAbilityName();
+        boolean hasParentName =
+                !parentNameForGuard.getStr().isEmpty() || parentNameForGuard.hasHash();
+        boolean monsterWithParentName =
+                hasParentName
+                        && this.player.getScene().getEntityById(invoke.getEntityId())
+                                instanceof EntityMonster;
+        if ((head.getInstancedAbilityId() == 0 && !isRemove && !monsterWithParentName)
+                || head.getInstancedModifierId() > 2000) {
+            emu.grasscutter.game.world.BossTraceHelper.dropped(
+                    this.player.getScene().getEntityById(invoke.getEntityId()),
+                    "modifier change (abilityIdx=" + head.getInstancedAbilityId()
+                            + " modId=" + head.getInstancedModifierId()
+                            + " localId=" + modChange.getModifierLocalId()
+                            + " parentName=" + hasParentName + ")");
             return;
         }
 
@@ -1073,6 +1143,8 @@ public final class AbilityManager extends BasePlayerManager {
 
             if (instancedAbilityData == null) {
                 Grasscutter.getLogger().trace("handleModifierChange: no ability data found for entityId={} parentAbility={}", invoke.getEntityId(), parentAbilityName);
+                emu.grasscutter.game.world.BossTraceHelper.dropped(
+                        entity, "modifier add: no ability data for parent " + parentAbilityName);
                 return;
             }
 
@@ -1087,6 +1159,10 @@ public final class AbilityManager extends BasePlayerManager {
             var modifierLocalId = modChange.getModifierLocalId();
             var modifierData = instancedAbilityData.modifierAt(modifierLocalId);
             if (modifierData == null) {
+                emu.grasscutter.game.world.BossTraceHelper.dropped(
+                        entity,
+                        "modifier add: localId " + modifierLocalId + " out of range for "
+                                + instancedAbilityData.abilityName);
                 Grasscutter.getLogger().trace(
                     "handleModifierChange: modifierLocalId={} out of bounds for ability={} (modifierCount={}), entityId={} modId={}",
                     modifierLocalId, instancedAbilityData.abilityName, instancedAbilityData.modifierCount(),
@@ -1278,6 +1354,9 @@ public final class AbilityManager extends BasePlayerManager {
         } else if (modChange.getAction() == ModifierAction.ModifierAction_REMOVED) {
             AbilityModifierController removed =
                     entity.getInstancedModifiers().remove(head.getInstancedModifierId());
+            if (removed != null && entity instanceof EntityMonster) {
+                rememberRemovedModifier(entity.getId(), head.getInstancedModifierId(), removed);
+            }
             if (removed != null && removed.getAbilityData() != null) {
                 try {
                     String tracedName = null;

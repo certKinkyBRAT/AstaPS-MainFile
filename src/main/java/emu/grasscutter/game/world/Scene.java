@@ -706,6 +706,7 @@ public class Scene {
     }
 
     public void killEntity(GameEntity target, int attackerId) {
+        BossTraceHelper.removed(target, "killed by " + attackerId);
         GameEntity attacker = null;
 
         if (attackerId > 0) {

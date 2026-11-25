@@ -130,6 +130,11 @@ public class ActionCreateGadget extends AbilityActionHandler {
         // below only recognises summons belonging to the one controller it is standing on - so the
         // previous cast's singers match nothing, and neither does the KillGadget that should retire
         // them when the skill ends.
+        emu.grasscutter.game.world.BossTraceHelper.gadgetCreated(
+                "requested by ability " + (ability.getData() != null ? ability.getData().abilityName : "?"),
+                action.gadgetID,
+                0,
+                entity.getId());
         if (clientOwnsChain(entity)) {
             return true;
         }
@@ -167,6 +172,8 @@ public class ActionCreateGadget extends AbilityActionHandler {
         // CreateGadget. A server EntityGadget has no SkillObj abilities and renders as Default_Item
         // — the weird floating “device” that hangs in the arena for the whole fight.
         if (emu.grasscutter.game.world.EffigyCombatHelper.isEffigyClientOwnedGadget(action.gadgetID)) {
+            emu.grasscutter.game.world.BossTraceHelper.gadgetCreated(
+                    "skipped (client places it)", action.gadgetID, 0, entity.getId());
             return true;
         }
 
@@ -255,6 +262,11 @@ public class ActionCreateGadget extends AbilityActionHandler {
         }
 
         entity.getScene().addEntity(entityCreated);
+        emu.grasscutter.game.world.BossTraceHelper.gadgetCreated(
+                "created by server at " + entityCreated.getPosition(),
+                action.gadgetID,
+                entityCreated.getId(),
+                owner.getId());
 
         Grasscutter.getLogger()
                 .trace(

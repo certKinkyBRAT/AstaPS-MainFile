@@ -119,6 +119,13 @@ public final class EffigyCombatHelper {
         // down and AttachModifierToHPPercentMixin falsely fires rebirth → floating crystals that
         // never clear. Re-assert server HP so the client stays in sync.
         resyncHp(monster);
+        BossTraceHelper.damage(
+                monster,
+                amount,
+                0f,
+                monster.getFightProperty(emu.grasscutter.game.props.FightProperty.FIGHT_PROP_CUR_HP),
+                monster.getFightProperty(emu.grasscutter.game.props.FightProperty.FIGHT_PROP_MAX_HP),
+                "blocked: Hypostasis shell");
         return true;
     }
 
@@ -126,8 +133,15 @@ public final class EffigyCombatHelper {
      * Effigy skill-obj gadgets the client already places. A server {@code EntityGadget} copy has no
      * SkillObj config and falls back to {@code Default_Item} — a weird floating “device” that never
      * receives KillSelf (especially {@code Effigy_InitialPos} / {@code Effigy_RushPos}).
+     *
+     * <p>The revival prisms are deliberately not here. The client asks the server to create them
+     * (a CreateGadget ability action, not an EvtCreateGadgetNotify), so skipping them meant no
+     * prisms ever appeared: the boss flew to the arena centre at 5% and then sat there unkillable.
      */
     public static boolean isEffigyClientOwnedGadget(int gadgetId) {
+        if (isEffigyRebornPrismGadget(gadgetId)) {
+            return false;
+        }
         return switch (gadgetId) {
             case 42004003, // ElectricBarrageEmitter
                     42004004, // ElectricDefenceCentre
@@ -135,16 +149,12 @@ public final class EffigyCombatHelper {
                     42004006, // InitialPos (center marker — often the lingering floaty)
                     42004007, // DefencePartCurrent
                     42004008, // ThunderDrop
-                    42004010, // RebornPart
                     42004012, // RushPos (ConfigBornByGlobalValue — stacks at origin)
                     42004013, // Elite pile
                     42004014, // elite charge bullet
                     42004015, // elite electric bullet
-                    42004016, // elite reborn
-                    42004017,
-                    42004018, // elite reborn big
-                    42004019,
-                    42004020 -> true;
+                    42004019, // elite charge bullet to avatar
+                    42004020 -> true; // elite effect electric bullet
             default -> false;
         };
     }
@@ -159,11 +169,40 @@ public final class EffigyCombatHelper {
     public static boolean isEffigyRebornPrismGadget(int gadgetId) {
         return switch (gadgetId) {
             case 42004010, // RebornPart
-                    42004016, // elite reborn
+                    42004016, // elite reborn small
+                    42004017, // elite reborn norm
                     42004018 -> // elite reborn big
                     true;
             default -> false;
         };
+    }
+
+    /**
+     * Removes the server prisms a Hypostasis owns once it dies. Their {@code lifeByOwnerIsAlive}
+     * flag is not enforced server-side, and the boss's own KillSelf-the-prisms step runs on the
+     * client only, so without this they would outlive the fight.
+     */
+    public static void onMonsterDeath(EntityMonster monster) {
+        if (!isEffigy(monster) || monster.getScene() == null) {
+            return;
+        }
+        try {
+            var scene = monster.getScene();
+            var prisms =
+                    scene.getEntities().values().stream()
+                            .filter(
+                                    e ->
+                                            e instanceof emu.grasscutter.game.entity.EntityGadget g
+                                                    && isEffigyRebornPrismGadget(g.getGadgetId())
+                                                    && g.getOwner() == monster)
+                            .toList();
+            for (var e : prisms) {
+                BossTraceHelper.removed(e, "owner Hypostasis died");
+                scene.removeEntity(e);
+            }
+        } catch (Throwable t) {
+            Grasscutter.getLogger().debug("[Effigy] remove prisms on death: {}", t.toString());
+        }
     }
 
     /** Drop leftover server Default_Item shells when the boss (re)spawns. */
@@ -178,7 +217,8 @@ public final class EffigyCombatHelper {
                             .filter(
                                     e ->
                                             e instanceof emu.grasscutter.game.entity.EntityGadget g
-                                                    && isEffigyClientOwnedGadget(g.getGadgetId())
+                                                    && (isEffigyClientOwnedGadget(g.getGadgetId())
+                                                            || isEffigyRebornPrismGadget(g.getGadgetId()))
                                                     && (g.getOwner() == monster
                                                             || g.getOwner() == null
                                                             || distanceSq(monster, g) < 80f * 80f))

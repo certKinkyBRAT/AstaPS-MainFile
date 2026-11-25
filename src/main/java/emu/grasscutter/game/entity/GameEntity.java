@@ -627,7 +627,14 @@ public abstract class GameEntity {
                             MultiShieldHelper.effectivenessFor(this, amount, killerId, attackType))) {
                 return;
             }
-            if (shieldSetup == null) return;
+            if (shieldSetup == null) {
+                emu.grasscutter.game.world.BossTraceHelper.damage(
+                        this, amount, 0f,
+                        getFightProperty(FightProperty.FIGHT_PROP_CUR_HP),
+                        getFightProperty(FightProperty.FIGHT_PROP_MAX_HP),
+                        "blocked: Invincible modifier");
+                return;
+            }
             // The stack just ran out. Breaking it recomputed the flag from the modifiers left, so a
             // separate Invincible modifier (the boss's return-to-born one, say) still blocks the hit.
             if (this.modifierInvincible) return;
@@ -686,6 +693,13 @@ public abstract class GameEntity {
 
         if (!Float.isFinite(effectiveDamage)) return;
         this.addFightProperty(FightProperty.FIGHT_PROP_CUR_HP, -effectiveDamage);
+        emu.grasscutter.game.world.BossTraceHelper.damage(
+                this,
+                event.getDamage(),
+                effectiveDamage,
+                getFightProperty(FightProperty.FIGHT_PROP_CUR_HP),
+                getFightProperty(FightProperty.FIGHT_PROP_MAX_HP),
+                limbo ? "limbo" : "");
 
         this.lastAttackType = attackType;
         this.checkIfDead();

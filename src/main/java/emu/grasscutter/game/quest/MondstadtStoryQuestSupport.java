@@ -21,7 +21,12 @@ public final class MondstadtStoryQuestSupport {
     private static final Set<Integer> MAIN_QUEST_IDS =
             Set.of(311, 427, 451, 452, 453, 454, 461, 462, 463, 469, 480, 481, 482, 484, 485,
                     // Xiangling's Trulla Chapter (reviewed gates; the first steps were "quest 0").
-                    11000, 11001, 11002, 11003, 11004, 11005);
+                    11000, 11001, 11002, 11003, 11004, 11005,
+                    // Mondstadt story quests with reviewed gates: Lisa, Diluc, Jean, Fabulae
+                    // Textile, Klee, Venti and Mona.
+                    10100, 10101, 464, 465, 466, 486, 487, 488, 489, 490, 492,
+                    12000, 12001, 12002, 12003, 10200, 10201, 10202,
+                    10110, 10111, 10112, 10113, 10500, 10501, 10502);
 
     private MondstadtStoryQuestSupport() {}
 

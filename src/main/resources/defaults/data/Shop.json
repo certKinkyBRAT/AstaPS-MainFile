@@ -13740,24 +13740,7 @@
         "secondarySheetId": 1,
         "refreshType": "SHOP_REFRESH_MONTHLY",
         "shopRefreshParam": 1,
-        "hcoin": 320
-      },
-      {
-        "goodsId": 102002,
-        "goodsItem": {
-          "id": 224,
-          "count": 1
-        },
-        "costItemList": [],
-        "buyLimit": 0,
-        "beginTime": 1575129600,
-        "endTime": 2051193600,
-        "minLevel": 4,
-        "maxLevel": 99,
-        "secondarySheetId": 1,
-        "refreshType": "SHOP_REFRESH_MONTHLY",
-        "shopRefreshParam": 1,
-        "hcoin": 320
+        "hcoin": 480
       },
       {
         "goodsId": 102003,

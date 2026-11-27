@@ -67,7 +67,7 @@ public final class QiqiEHealHelper {
         HealParams params = readParams(caster.getAvatar(), skillId);
         if (params.ratio <= 0f && params.flat <= 0f) return;
 
-        int ticks = Math.max(1, params.durationSec / TICK_SEC);
+        int ticks = Math.max(1, (params.durationSec + TICK_SEC - 1) / TICK_SEC);
         int uid = player.getUid();
         int casterId = caster.getId();
         AtomicInteger remaining = new AtomicInteger(ticks);
@@ -77,7 +77,12 @@ public final class QiqiEHealHelper {
                         .getScheduler()
                         .scheduleDelayedRepeatingTask(
                                 () -> {
-                                    if (remaining.decrementAndGet() < 0) {
+                                    // A cancelled task may already be queued when Qiqi is recast or
+                                    // the player is cleaned up. It must not touch the replacement task.
+                                    if (!isCurrentTask(uid, taskHolder[0])) {
+                                        return;
+                                    }
+                                    if (remaining.getAndDecrement() <= 0) {
                                         Grasscutter.getGameServer().getScheduler().cancelTask(taskHolder[0]);
                                         TASK_IDS.remove(uid);
                                         return;
@@ -111,6 +116,9 @@ public final class QiqiEHealHelper {
     private static void tickHeal(Player player, EntityAvatar qiqi, HealParams params) {
         EntityAvatar active = player.getTeamManager().getCurrentAvatarEntity();
         if (active == null || !active.isAlive()) return;
+        float currentHp = active.getFightProperty(FightProperty.FIGHT_PROP_CUR_HP);
+        float maxHp = active.getFightProperty(FightProperty.FIGHT_PROP_MAX_HP);
+        if (!Float.isFinite(currentHp) || !Float.isFinite(maxHp) || currentHp >= maxHp) return;
         float atk = qiqi.getFightProperty(FightProperty.FIGHT_PROP_CUR_ATTACK);
         float amount = atk * params.ratio + params.flat;
         float healAdd = qiqi.getFightProperty(FightProperty.FIGHT_PROP_HEAL_ADD);
@@ -224,6 +232,10 @@ public final class QiqiEHealHelper {
             } catch (Throwable ignored) {
             }
         }
+    }
+
+    private static boolean isCurrentTask(int uid, int taskId) {
+        return taskId >= 0 && TASK_IDS.get(uid) == taskId;
     }
 
     private static final class HealParams {

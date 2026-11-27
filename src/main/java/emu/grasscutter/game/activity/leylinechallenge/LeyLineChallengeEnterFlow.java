@@ -26,6 +26,9 @@ public final class LeyLineChallengeEnterFlow {
      *     the official activity-page {@code EnterReq}
      */
     public static void enter(Player player, int difficulty, boolean fromWorktop) {
-        // no-op
+        if (player == null || difficulty < 1 || difficulty > 6) return;
+        if (player.getServer().getDungeonSystem().enterDungeon(player, 0, 40840 + difficulty - 1, true)) {
+            emu.grasscutter.game.dungeons.DomainDungeonHelper.onPlayerEnterDomain(player);
+        }
     }
 }

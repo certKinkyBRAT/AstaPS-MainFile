@@ -21,7 +21,8 @@ public final class LeyLineChallengeGroupLoader {
      * {@link #isEntranceGadget} answers {@code false}; {@code 0} is not a valid option id, so it can
      * never match a real request by accident.
      */
-    public static final int ENTER_OPTION_ID = 0;
+    public static final int ENTER_OPTION_ID = 7;
+    public static final int ENTRANCE_GADGET_ID = 73051002;
 
     private LeyLineChallengeGroupLoader() {}
 
@@ -36,6 +37,6 @@ public final class LeyLineChallengeGroupLoader {
      * @return always {@code false} - no gadget is recognised yet.
      */
     public static boolean isEntranceGadget(EntityGadget gadget) {
-        return false;
+        return gadget != null && gadget.getGadgetId() == ENTRANCE_GADGET_ID;
     }
 }

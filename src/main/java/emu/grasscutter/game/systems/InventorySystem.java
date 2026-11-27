@@ -249,8 +249,11 @@ public class InventorySystem extends BaseGameSystem {
         }
 
         // Packet
-        player.sendPacket(new PacketStoreItemChangeNotify(relic));
         player.sendPacket(new PacketReliquaryUpgradeRsp(relic, rate, oldLevel, oldAppendPropIdList));
+        // The leveling screen consumes the upgrade response to render the new
+        // level and substats. Send the inventory snapshot afterwards so it
+        // cannot overwrite that preview with the pre-upgrade cached item.
+        player.sendPacket(new PacketStoreItemChangeNotify(relic));
 
         try {
             emu.grasscutter.game.player.InvestigationHandbookHelper.refreshAndNotify(player);

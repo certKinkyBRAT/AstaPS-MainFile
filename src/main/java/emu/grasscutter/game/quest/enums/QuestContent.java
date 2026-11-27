@@ -35,7 +35,7 @@ public enum QuestContent implements QuestTrigger {
     QUEST_CONTENT_DAILY_TASK_COMP_FINISH(26), // missing, currently unused
     QUEST_CONTENT_FINISH_ITEM_GIVING(27),
     QUEST_CONTENT_SKILL(107),
-    QUEST_CONTENT_CITY_LEVEL_UP(109), // missing, finish
+    QUEST_CONTENT_CITY_LEVEL_UP(109),
     QUEST_CONTENT_PATTERN_GROUP_CLEAR_MONSTER(110), // missing, finish, for random quests
     QUEST_CONTENT_ITEM_LESS_THAN(111),
     QUEST_CONTENT_PLAYER_LEVEL_UP(112),
@@ -58,7 +58,7 @@ public enum QuestContent implements QuestTrigger {
     QUEST_CONTENT_ANY_MANUAL_TRANSPORT(129),
     QUEST_CONTENT_USE_ITEM(130),
     QUEST_CONTENT_MAIN_COOP_ENTER_ANY_SAVE_POINT(131), // missing, finish and fail
-    QUEST_CONTENT_ENTER_MY_HOME_WORLD(132), // missing, finish and fail
+    QUEST_CONTENT_ENTER_MY_HOME_WORLD(132),
     QUEST_CONTENT_ENTER_MY_WORLD_SCENE(133), // missing, finish
     QUEST_CONTENT_TIME_VAR_GT_EQ(134),
     QUEST_CONTENT_TIME_VAR_PASS_DAY(135),

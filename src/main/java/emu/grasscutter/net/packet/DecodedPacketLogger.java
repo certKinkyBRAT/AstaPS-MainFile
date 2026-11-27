@@ -8,6 +8,7 @@ import com.google.protobuf.Message;
 import com.google.protobuf.UnknownFieldSet;
 import emu.grasscutter.Grasscutter;
 import emu.grasscutter.server.game.GameSession;
+import emu.grasscutter.utils.ProtoSniff;
 import java.lang.reflect.Method;
 import java.util.HexFormat;
 import java.util.Map;
@@ -21,12 +22,12 @@ public final class DecodedPacketLogger {
     private DecodedPacketLogger() {}
 
     /**
-     * Log a packet independently of whether the server has a handler for its opcode.
-     * Payload decoding is optional, and undecodable bytes remain available for debugging.
+     * Log a packet independently of whether the server has a handler for its opcode. Payload
+     * decoding is optional, and undecodable bytes remain available for debugging.
      */
     public static void logDecodedPacket(GameSession session, String direction, int opcode,
             byte[] payload, PacketHandler handler) {
-        if (payload == null || !shouldDump(opcode)) {
+        if (payload == null || !shouldDump(opcode, "RECV".equals(direction), handler)) {
             return;
         }
 
@@ -35,30 +36,44 @@ public final class DecodedPacketLogger {
         Grasscutter.getLogger().info("{}: {} ({}){}", direction, name, opcode, handlerLabel);
 
         if (GAME_INFO.isShowPacketPayload) {
-            Grasscutter.getLogger().info("{}", formatPayload(opcode, payload, handler));
+            Grasscutter.getLogger().info("{}",
+                    formatPayload(opcode, payload, handler, GAME_INFO.isShowPacketRawFields));
         }
     }
 
     static String formatPayload(int opcode, byte[] payload, PacketHandler handler) {
+        return formatPayload(opcode, payload, handler, false);
+    }
+
+    static String formatPayload(int opcode, byte[] payload, PacketHandler handler,
+            boolean includeRawFields) {
         var parser = findParser(opcode, handler);
+        byte[] decodedPayload = ProtoFieldNumberOverrides.toGeneratedFieldNumbers(
+                opcode, handler, payload);
+        String formatted = null;
         if (parser.isPresent()) {
             try {
-                Object result = parser.get().invoke(null, (Object) payload);
+                Object result = parser.get().invoke(null, (Object) decodedPayload);
                 if (result instanceof Message message) {
-                    return message.toString();
+                    formatted = message.toString();
                 }
             } catch (ReflectiveOperationException ignored) {
                 // Preserve the wire bytes if this payload cannot be decoded as its named message.
             }
         }
 
-        var raw = new StringBuilder("payload=").append(HexFormat.of().formatHex(payload));
-        try {
-            raw.append(", rawFields=").append(UnknownFieldSet.parseFrom(payload));
-        } catch (InvalidProtocolBufferException ignored) {
-            raw.append(" (non-protobuf payload)");
+        if (formatted == null) {
+            var raw = new StringBuilder("payload=").append(HexFormat.of().formatHex(payload));
+            try {
+                raw.append(", rawFields=").append(UnknownFieldSet.parseFrom(payload));
+            } catch (InvalidProtocolBufferException ignored) {
+                raw.append(" (non-protobuf payload)");
+            }
+            formatted = raw.toString();
         }
-        return raw.toString();
+
+        return includeRawFields ? formatted + "\nrawWireFields=" + ProtoSniff.describe(payload)
+                : formatted;
     }
 
     static Optional<Method> findParser(int opcode, PacketHandler handler) {
@@ -90,12 +105,17 @@ public final class DecodedPacketLogger {
     }
 
     static boolean shouldDump(int opcode) {
+        return shouldDump(opcode, false, null);
+    }
+
+    static boolean shouldDump(int opcode, boolean received, PacketHandler handler) {
         if (PacketOpcodes.BANNED_PACKETS.contains(opcode)) {
             return false;
         }
         return switch (GAME_INFO.logPackets) {
             case ALL -> !PacketOpcodesUtils.LOOP_PACKETS.contains(opcode)
                     || GAME_INFO.isShowLoopPackets;
+            case MISSING -> received && handler == null;
             case WHITELIST -> SERVER.debugWhitelist.contains(opcode);
             case BLACKLIST -> !SERVER.debugBlacklist.contains(opcode);
             default -> false;

@@ -9,8 +9,10 @@ import emu.grasscutter.command.CommandHandler;
 import emu.grasscutter.command.CommandOutput;
 import emu.grasscutter.game.player.Player;
 import emu.grasscutter.net.packet.PacketOpcodesUtils;
+import emu.grasscutter.net.packet.ProtoFieldNumberOverrides;
 import com.google.protobuf.Descriptors;
-import java.lang.reflect.InvocationTargetException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 import picocli.CommandLine;
@@ -26,19 +28,25 @@ public final class ProtoCommand implements CommandHandler {
         var commandLine = new CommandLine(new Root(sender));
         commandLine.addSubcommand("mode", new Mode(sender));
         commandLine.addSubcommand("payload", new Payload(sender));
+        commandLine.addSubcommand("raw", new Raw(sender));
         commandLine.addSubcommand("loops", new Loops(sender));
         commandLine.addSubcommand("whitelist", new Whitelist(sender));
         commandLine.addSubcommand("blacklist", new Blacklist(sender));
         commandLine.addSubcommand("info", new Info(sender));
+        commandLine.addSubcommand("field", new Field(sender));
         return commandLine;
     }
 
     private static void showStatus(Player sender) {
         CommandOutput.sendMessage(sender, "Proto logging mode: " + GAME_INFO.logPackets);
         CommandOutput.sendMessage(sender, "Payload logging: " + (GAME_INFO.isShowPacketPayload ? "on" : "off"));
+        CommandOutput.sendMessage(sender, "Raw field logging: " + (GAME_INFO.isShowPacketRawFields ? "on" : "off"));
         CommandOutput.sendMessage(sender, "Loop packet logging: " + (GAME_INFO.isShowLoopPackets ? "on" : "off"));
         CommandOutput.sendMessage(sender, "Whitelist: " + new TreeSet<>(currentWhitelist()));
         CommandOutput.sendMessage(sender, "Blacklist: " + new TreeSet<>(currentBlacklist()));
+        var fieldOverrides = ProtoFieldNumberOverrides.listFieldNumbers();
+        CommandOutput.sendMessage(sender, "Proto field overrides: "
+                + (fieldOverrides.isEmpty() ? "none" : String.join(", ", fieldOverrides)));
         CommandOutput.sendMessage(sender, "Changes apply immediately and are not saved to config.json.");
     }
 
@@ -71,7 +79,7 @@ public final class ProtoCommand implements CommandHandler {
         var output = new StringBuilder()
                 .append("Opcode: ").append(opcodeLabel)
                 .append("\nName: ").append(messageName);
-        var descriptor = findDescriptor(messageName);
+        var descriptor = ProtoFieldNumberOverrides.findMessageDescriptor(messageName);
         if (descriptor == null) {
             return output.append("\nStructure: unavailable (no protobuf definition found for ")
                     .append(messageName).append(").").toString();
@@ -94,21 +102,6 @@ public final class ProtoCommand implements CommandHandler {
         try {
             return Integer.valueOf(input);
         } catch (NumberFormatException ignored) {
-            return null;
-        }
-    }
-
-    private static Descriptors.Descriptor findDescriptor(String messageName) {
-        if (messageName == null || messageName.equals("UNKNOWN") || messageName.isBlank()) {
-            return null;
-        }
-        String outerClassName = "emu.grasscutter.net.proto." + messageName + "OuterClass";
-        try {
-            Class<?> outerClass = Class.forName(outerClassName);
-            var fileDescriptor = (Descriptors.FileDescriptor) outerClass.getMethod("getDescriptor").invoke(null);
-            return fileDescriptor.findMessageTypeByName(messageName);
-        } catch (ClassNotFoundException | NoSuchMethodException | IllegalAccessException
-                | InvocationTargetException exception) {
             return null;
         }
     }
@@ -147,6 +140,82 @@ public final class ProtoCommand implements CommandHandler {
         }
     }
 
+    @CommandLine.Command(
+            name = "field",
+            description = "Set, reset, or list runtime protobuf field-number overrides. Use "
+                    + "<source.proto:Message.Nested> for nested messages.")
+    private static final class Field implements Runnable {
+        private final Player sender;
+
+        @Parameters(index = "0", arity = "0..1", paramLabel = "<message|source.proto:message|list>")
+        private String message;
+
+        @Parameters(index = "1", arity = "0..1", paramLabel = "[field]")
+        private String field;
+
+        @Parameters(index = "2", arity = "0..1", paramLabel = "[number|reset]")
+        private String value;
+
+        private Field(Player sender) {
+            this.sender = sender;
+        }
+
+        @Override
+        public void run() {
+            if (message == null || message.equalsIgnoreCase("list")) {
+                if (field != null || value != null) {
+                    report(sender, "Usage: proto field <message|source.proto:Message.Nested> <field> "
+                            + "<number|reset>, or proto field list.");
+                    return;
+                }
+                var active = ProtoFieldNumberOverrides.listFieldNumbers();
+                report(sender, active.isEmpty() ? "No runtime protobuf field overrides."
+                        : "Runtime protobuf field overrides: " + String.join(", ", active));
+                return;
+            }
+
+            if (field == null || value == null) {
+                report(sender, "Usage: proto field <message|source.proto:Message.Nested> <field> "
+                        + "<number|reset>, or proto field list.");
+                return;
+            }
+
+            var descriptor = ProtoFieldNumberOverrides.findMessageDescriptor(message);
+            if (descriptor == null) {
+                report(sender, "No generated protobuf message found for " + message + ".");
+                return;
+            }
+            if (descriptor.findFieldByName(field) == null) {
+                report(sender, "No field named " + field + " in " + message + ".");
+                return;
+            }
+
+            if (value.equalsIgnoreCase("reset")) {
+                boolean removed = ProtoFieldNumberOverrides.clearFieldNumber(descriptor, field);
+                report(sender, removed
+                        ? "Reset " + message + "." + field + " to its generated field number."
+                        : message + "." + field + " has no runtime override.");
+                return;
+            }
+
+            final int newNumber;
+            try {
+                newNumber = Integer.parseInt(value);
+            } catch (NumberFormatException exception) {
+                report(sender, "Expected a positive field number or reset.");
+                return;
+            }
+
+            try {
+                ProtoFieldNumberOverrides.setFieldNumber(descriptor, field, newNumber);
+                report(sender, message + "." + field + " now uses field number " + newNumber
+                        + " at packet boundaries (runtime only).");
+            } catch (IllegalArgumentException exception) {
+                report(sender, "Could not set " + message + "." + field + ": " + exception.getMessage());
+            }
+        }
+    }
+
     @CommandLine.Command(name = "proto", description = "Show the current runtime packet logging settings.")
     private static final class Root implements Runnable {
         private final Player sender;
@@ -161,7 +230,7 @@ public final class ProtoCommand implements CommandHandler {
         }
     }
 
-    @CommandLine.Command(name = "mode", description = "Set packet logging mode: none, all, whitelist, or blacklist.")
+    @CommandLine.Command(name = "mode", description = "Set packet logging mode: none, all, missing, whitelist, or blacklist.")
     private static final class Mode implements Runnable {
         private final Player sender;
 
@@ -177,12 +246,13 @@ public final class ProtoCommand implements CommandHandler {
             ServerDebugMode selected = switch (mode.toLowerCase(java.util.Locale.ROOT)) {
                 case "none" -> ServerDebugMode.NONE;
                 case "all" -> ServerDebugMode.ALL;
+                case "missing" -> ServerDebugMode.MISSING;
                 case "whitelist" -> ServerDebugMode.WHITELIST;
                 case "blacklist" -> ServerDebugMode.BLACKLIST;
                 default -> null;
             };
             if (selected == null) {
-                report(sender, "Unknown packet logging mode. Use none, all, whitelist, or blacklist.");
+                report(sender, "Unknown packet logging mode. Use none, all, missing, whitelist, or blacklist.");
                 return;
             }
             GAME_INFO.logPackets = selected;
@@ -213,6 +283,30 @@ public final class ProtoCommand implements CommandHandler {
         }
     }
 
+    @CommandLine.Command(name = "raw", description = "Enable or disable raw protobuf field logging alongside decoded content.")
+    private static final class Raw implements Runnable {
+        private final Player sender;
+
+        @Parameters(index = "0", paramLabel = "<on|off>")
+        private String value;
+
+        private Raw(Player sender) {
+            this.sender = sender;
+        }
+
+        @Override
+        public void run() {
+            Boolean enabled = parseToggle(value);
+            if (enabled == null) {
+                report(sender, "Expected on or off.");
+                return;
+            }
+            GAME_INFO.isShowPacketRawFields = enabled;
+            report(sender, "Raw protobuf field logging " + (enabled ? "enabled." : "disabled.")
+                    + " It is shown only when payload logging is enabled.");
+        }
+    }
+
     @CommandLine.Command(name = "loops", description = "Enable or disable logging of loop packets.")
     private static final class Loops implements Runnable {
         private final Player sender;
@@ -240,11 +334,11 @@ public final class ProtoCommand implements CommandHandler {
         private final Player sender;
         private final boolean whitelist;
 
-        @Parameters(index = "0", paramLabel = "<add|remove>")
+        @Parameters(index = "0", paramLabel = "<add|remove|clear>")
         private String action;
 
-        @Parameters(index = "1", paramLabel = "<opcode>")
-        private int opcode;
+        @Parameters(index = "1", arity = "0..*", paramLabel = "[opcode...]")
+        private List<Integer> opcodes = new ArrayList<>();
 
         private OpcodeFilter(Player sender, boolean whitelist) {
             this.sender = sender;
@@ -253,43 +347,70 @@ public final class ProtoCommand implements CommandHandler {
 
         @Override
         public void run() {
-            if (opcode <= 0) {
-                report(sender, "Opcode must be a positive integer.");
+            String normalizedAction = action.toLowerCase(java.util.Locale.ROOT);
+            if (!normalizedAction.equals("add")
+                    && !normalizedAction.equals("remove")
+                    && !normalizedAction.equals("clear")) {
+                report(sender, "Expected add, remove, or clear.");
                 return;
             }
 
             Set<Integer> configured = whitelist ? currentWhitelist() : currentBlacklist();
             var updated = new TreeSet<>(configured);
-            String normalizedAction = action.toLowerCase(java.util.Locale.ROOT);
-            if (!normalizedAction.equals("add") && !normalizedAction.equals("remove")) {
-                report(sender, "Expected add or remove.");
-                return;
-            }
-            boolean changed =
-                    normalizedAction.equals("add") ? updated.add(opcode) : updated.remove(opcode);
-
-            Set<Integer> result = Set.copyOf(updated);
-            if (whitelist) {
-                SERVER.debugWhitelist = result;
+            if (normalizedAction.equals("clear")) {
+                if (!opcodes.isEmpty()) {
+                    report(sender, "Clear does not accept opcodes.");
+                    return;
+                }
+                updated.clear();
             } else {
-                SERVER.debugBlacklist = result;
+                if (opcodes.isEmpty()) {
+                    report(sender, "At least one opcode is required for add or remove.");
+                    return;
+                }
+                for (int opcode : opcodes) {
+                    if (opcode <= 0) {
+                        report(sender, "Opcode must be a positive integer.");
+                        return;
+                    }
+                }
+
+                for (int opcode : opcodes) {
+                    if (normalizedAction.equals("add")) {
+                        updated.add(opcode);
+                    } else {
+                        updated.remove(opcode);
+                    }
+                }
+            }
+
+            if (whitelist) {
+                SERVER.debugWhitelist = Set.copyOf(updated);
+            } else {
+                SERVER.debugBlacklist = Set.copyOf(updated);
             }
 
             String filterName = whitelist ? "Whitelist" : "Blacklist";
-            report(sender, changed
-                    ? filterName + (normalizedAction.equals("add") ? " added " : " removed ") + opcode + "."
-                    : filterName + " already had no change for opcode " + opcode + ".");
+            if (normalizedAction.equals("clear")) {
+                report(sender, configured.isEmpty()
+                        ? filterName + " was already empty."
+                        : filterName + " cleared.");
+            } else {
+                report(sender, configured.equals(updated)
+                        ? filterName + " already had no change for opcodes " + opcodes + "."
+                        : filterName + (normalizedAction.equals("add") ? " added " : " removed ") + opcodes + ".");
+            }
         }
     }
 
-    @CommandLine.Command(name = "whitelist", description = "Add or remove an opcode from the packet whitelist.")
+    @CommandLine.Command(name = "whitelist", description = "Add, remove, or clear packet whitelist opcodes.")
     private static final class Whitelist extends OpcodeFilter {
         private Whitelist(Player sender) {
             super(sender, true);
         }
     }
 
-    @CommandLine.Command(name = "blacklist", description = "Add or remove an opcode from the packet blacklist.")
+    @CommandLine.Command(name = "blacklist", description = "Add, remove, or clear packet blacklist opcodes.")
     private static final class Blacklist extends OpcodeFilter {
         private Blacklist(Player sender) {
             super(sender, false);

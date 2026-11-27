@@ -27,16 +27,6 @@ import emu.grasscutter.server.packet.send.PacketEntityFightPropUpdateNotify;
 @Opcodes(PacketOpcodes.CombatInvocationsNotify)
 public class HandlerCombatInvocationsNotify extends PacketHandler {
 
-    /** Odette's Dancing Queen is a client-owned shadow SkillObj. Its local hit can arrive with
-     * zero damage even though the shadow's authored ability is present on the gadget. */
-    private static boolean isOdetteShadow(EntityClientGadget gadget) {
-        if (gadget == null) return false;
-        return gadget.getInstancedAbilities().stream()
-                .filter(java.util.Objects::nonNull)
-                .map(a -> a.getData() != null ? a.getData().abilityName : null)
-                .anyMatch(name -> name != null && name.startsWith("Avatar_Odette_"));
-    }
-
     @Override
     public void handle(GameSession session, byte[] header, byte[] payload) throws Exception {
         CombatInvocationsNotify notif = CombatInvocationsNotify.parseFrom(payload);
@@ -68,12 +58,6 @@ public class HandlerCombatInvocationsNotify extends PacketHandler {
                                 gadget = g;
                             } else if (attackerEntity instanceof EntityAvatar) {
                                 gadget = findVentiHexenzirkelArrowGadget(player, attackResult.getAttackerId());
-                            }
-                            // Unlike ordinary avatar hits, the shadow reports its local hit with
-                            // zero server damage. Keep the authored client gadget as the attacker;
-                            // the shared rewrite below supplies damage and Cryo element.
-                            if (gadget != null && isOdetteShadow(gadget)) {
-                                attackerGadget = gadget;
                             }
                             if (gadget != null) {
                                 for (var ab : gadget.getInstancedAbilities()) {
@@ -134,11 +118,7 @@ public class HandlerCombatInvocationsNotify extends PacketHandler {
                             float critRate = avatarEntity.getFightProperty(FightProperty.FIGHT_PROP_CRITICAL);
                             float critDmg = avatarEntity.getFightProperty(FightProperty.FIGHT_PROP_CRITICAL_HURT);
 
-                            if (isOdetteShadow(attackerGadget)) {
-                                computedDamage = Math.max(1f, atk);
-                            } else {
-                                computedDamage = atk * hexRatio * normalPct * (1f + anemoDmgBonus);
-                            }
+                            computedDamage = atk * hexRatio * normalPct * (1f + anemoDmgBonus);
 
                             if (Math.random() < critRate) {
                                 computedDamage *= (1f + critDmg);
@@ -154,7 +134,7 @@ public class HandlerCombatInvocationsNotify extends PacketHandler {
                             // Infused NA often arrives with elementType=0 when ratio was 0; wind floaters
                             // need Anemo (7) or the client may skip the number even after we rewrite damage.
                             if (attackerGadget != null && attackResult.getElementType() == 0) {
-                                resultBuilder.setElementType(isOdetteShadow(attackerGadget) ? 5 : 7);
+                                resultBuilder.setElementType(7);
                             }
                             AttackResult newResult = resultBuilder.build();
                             hitInfo = hitInfo.toBuilder().setAttackResult(newResult).build();
